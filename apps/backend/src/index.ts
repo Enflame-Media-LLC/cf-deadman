@@ -2,6 +2,8 @@ import { createApp } from "./app";
 import type { ActionJob } from "./domain/types";
 import type { Env } from "./env";
 import { tickSchedule } from "./execution/scheduler";
+import { handleActionMessage } from "./execution/coordinator";
+import { unconfiguredExecutor } from "./execution/executor";
 
 const app = createApp();
 
@@ -9,8 +11,16 @@ async function onSchedule(env: Env): Promise<void> {
   await tickSchedule(env, new Date());
 }
 
-async function onQueue(_batch: MessageBatch<ActionJob>, _env: Env): Promise<void> {
-  // The action coordinator is installed in Task 7.
+async function onQueue(batch: MessageBatch<ActionJob>, env: Env): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      await handleActionMessage(env, message.body, unconfiguredExecutor, new Date());
+      message.ack();
+    } catch {
+      console.error("action_message_failed", { messageId: message.id });
+      message.retry();
+    }
+  }
 }
 
 export default {
