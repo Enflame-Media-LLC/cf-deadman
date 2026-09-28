@@ -2,10 +2,12 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Env } from "./env";
 import { createAuth } from "./auth/auth";
 import { claimOwner } from "./auth/setup";
+import { registerSwitchRoutes } from "./switch/routes";
 
 export function createApp(): OpenAPIHono<{ Bindings: Env }> {
   const app = new OpenAPIHono<{ Bindings: Env }>();
   app.get("/api/health", (context) => context.json({ status: "ok" }));
+  registerSwitchRoutes(app);
   app.post("/api/setup", async (context) => {
     const body = await context.req.json<{ setupSecret: string; email: string; password: string }>();
     const result = await claimOwner(context.env, body);
