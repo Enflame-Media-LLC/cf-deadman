@@ -12,7 +12,7 @@ async function claimTestOwner(): Promise<string> {
   await env.DB.prepare("DELETE FROM switches").run();
   await env.DB.prepare("DELETE FROM owner_slot").run();
   return (await claimOwner(env, {
-    setupSecret: "test-setup-secret", email: "checkin@example.com", password: "correct horse battery staple",
+    setupSecret: "test-setup-secret-at-least-thirty-two-characters", email: "checkin@example.com", password: "correct horse battery staple",
   })).ownerId;
 }
 

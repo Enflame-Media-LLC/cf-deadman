@@ -3,10 +3,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "paths": { "@/*": ["./apps/web/src/*"] },
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types", "vitest/globals"]
+    "types": ["@cloudflare/vitest-plugin/types", "vitest/globals"]
   },
   "include": ["apps/**/*.ts", "apps/**/*.vue", "worker-configuration.d.ts", "vite.config.ts", "vitest.config.ts"]
 }

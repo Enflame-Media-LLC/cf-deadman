@@ -4,12 +4,19 @@ import { createAuth } from "./auth/auth";
 import { claimOwner } from "./auth/setup";
 import { registerSwitchRoutes } from "./switch/routes";
 import { registerCheckInRoutes } from "./checkin/routes";
+import { registerDocsRoutes } from "./api/docs";
 
 export function createApp(): OpenAPIHono<{ Bindings: Env }> {
   const app = new OpenAPIHono<{ Bindings: Env }>();
   app.get("/api/health", (context) => context.json({ status: "ok" }));
   registerSwitchRoutes(app);
   registerCheckInRoutes(app);
+  registerDocsRoutes(app);
+  app.get("/api/setup/status", async (context) => {
+    const row = await context.env.DB.prepare("SELECT owner_id FROM owner_slot WHERE id = 1")
+      .first<{ owner_id: string | null }>();
+    return context.json({ claimed: Boolean(row?.owner_id) });
+  });
   app.post("/api/setup", async (context) => {
     const body = await context.req.json<{ setupSecret: string; email: string; password: string }>();
     const result = await claimOwner(context.env, body);
@@ -19,6 +26,7 @@ export function createApp(): OpenAPIHono<{ Bindings: Env }> {
     const path = new URL(context.req.url).pathname;
     if (path.startsWith("/api/auth/sign-up/") ||
         path.startsWith("/api/auth/api-key/") ||
+        path === "/api/auth/delete-user" ||
         path === "/api/auth/two-factor/disable") {
       return context.json({ error: "Endpoint is restricted" }, 403);
     }

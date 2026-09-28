@@ -7,6 +7,20 @@ function reject(): never {
   throw new HTTPException(403, { message: "Setup claim denied" });
 }
 
+async function matchingSecret(expected: string, actual: string): Promise<boolean> {
+  if (expected.length < 32) return false;
+  const encoder = new TextEncoder();
+  const [expectedHash, actualHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+    crypto.subtle.digest("SHA-256", encoder.encode(actual)),
+  ]);
+  const left = new Uint8Array(expectedHash);
+  const right = new Uint8Array(actualHash);
+  let difference = 0;
+  for (let index = 0; index < left.length; index++) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
 export async function claimOwner(
   env: Env,
   input: { setupSecret: string; email: string; password: string },
@@ -19,7 +33,7 @@ export async function claimOwner(
   if (!parsed.success) {
     throw new HTTPException(400, { message: "Valid email and a password of at least 12 characters required" });
   }
-  if (!env.SETUP_SECRET || !parsed.data.setupSecret || parsed.data.setupSecret !== env.SETUP_SECRET) reject();
+  if (!env.SETUP_SECRET || !parsed.data.setupSecret || !await matchingSecret(env.SETUP_SECRET, parsed.data.setupSecret)) reject();
   const email = parsed.data.email.trim().toLowerCase();
   const claimNonce = crypto.randomUUID();
   const now = new Date().toISOString();

@@ -2,6 +2,8 @@ import { applyD1Migrations, env, SELF } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { claimOwner } from "./setup";
 
+const setupSecret = "test-setup-secret-at-least-thirty-two-characters";
+
 function cookieHeader(response: Response): string {
   return response.headers.getSetCookie().map((cookie) => cookie.split(";", 1)[0]).join("; ");
 }
@@ -36,7 +38,7 @@ beforeEach(async () => {
 
 describe("single owner", () => {
   it("claims one owner", async () => {
-    const owner = await claimOwner(env, { setupSecret: "test-setup-secret", email: "owner@example.com", password: "correct horse battery staple" });
+    const owner = await claimOwner(env, { setupSecret, email: "owner@example.com", password: "correct horse battery staple" });
     expect(owner.ownerId).toBeTruthy();
     const count = await env.DB.prepare('SELECT count(*) AS n FROM "user"').first<{ n: number }>();
     expect(count?.n).toBe(1);
@@ -46,8 +48,15 @@ describe("single owner", () => {
     await expect(claimOwner(env, { setupSecret: "wrong", email: "a@example.com", password: "correct horse battery staple" })).rejects.toThrow();
   });
 
+  it("rejects a weak configured setup secret", async () => {
+    await expect(claimOwner({ ...env, SETUP_SECRET: "short" }, {
+      setupSecret: "short", email: "owner@example.com", password: "correct horse battery staple",
+    })).rejects.toThrow();
+    expect(await env.DB.prepare("SELECT id FROM owner_slot").first()).toBeNull();
+  });
+
   it("rejects malformed signup without reserving the owner", async () => {
-    await expect(claimOwner(env, { setupSecret: "test-setup-secret", email: "invalid", password: "correct horse battery staple" })).rejects.toThrow();
+    await expect(claimOwner(env, { setupSecret, email: "invalid", password: "correct horse battery staple" })).rejects.toThrow();
     const row = await env.DB.prepare("SELECT id FROM owner_slot").first();
     expect(row).toBeNull();
   });
@@ -61,10 +70,15 @@ describe("single owner", () => {
     expect(response.status).toBe(403);
   });
 
+  it("blocks owner deletion through Better Auth", async () => {
+    const response = await SELF.fetch("http://localhost/api/auth/delete-user", { method: "POST" });
+    expect(response.status).toBe(403);
+  });
+
   it("concurrent claims yield one owner", async () => {
     const attempts = await Promise.allSettled([
-      claimOwner(env, { setupSecret: "test-setup-secret", email: "one@example.com", password: "correct horse battery staple" }),
-      claimOwner(env, { setupSecret: "test-setup-secret", email: "two@example.com", password: "correct horse battery staple" }),
+      claimOwner(env, { setupSecret, email: "one@example.com", password: "correct horse battery staple" }),
+      claimOwner(env, { setupSecret, email: "two@example.com", password: "correct horse battery staple" }),
     ]);
     expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
     const row = await env.DB.prepare("SELECT owner_id FROM owner_slot WHERE id = 1").first<{ owner_id: string }>();
@@ -74,14 +88,14 @@ describe("single owner", () => {
   it("resumes pending claim", async () => {
     await env.DB.prepare("INSERT INTO owner_slot (id, claim_nonce, claim_email, claim_started_at) VALUES (1, ?, ?, ?)")
       .bind("incomplete", "owner@example.com", new Date().toISOString()).run();
-    const owner = await claimOwner(env, { setupSecret: "test-setup-secret", email: "owner@example.com", password: "correct horse battery staple" });
+    const owner = await claimOwner(env, { setupSecret, email: "owner@example.com", password: "correct horse battery staple" });
     expect(owner.ownerId).toBeTruthy();
   });
 
   it("records fresh owner TOTP proof", async () => {
     const email = "totp@example.com";
     const password = "correct horse battery staple";
-    await claimOwner(env, { setupSecret: "test-setup-secret", email, password });
+    await claimOwner(env, { setupSecret, email, password });
     const login = await SELF.fetch("http://localhost/api/auth/sign-in/email", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ email, password }),

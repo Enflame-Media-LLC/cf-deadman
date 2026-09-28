@@ -1,0 +1,5 @@
+# Replace each value with a different random string before running locally or deploying.
+# Example: openssl rand -hex 32
+SETUP_SECRET=
+BETTER_AUTH_SECRET=
+DATA_ENCRYPTION_KEY=

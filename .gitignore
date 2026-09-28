@@ -4,5 +4,9 @@
 .worktrees/
 node_modules/
 dist/
+apps/web/public/index.html
+apps/web/public/assets/
 .dev.vars*
+!.dev.vars.example
 .env*
+.wrangler/
