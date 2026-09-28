@@ -1,11 +1,12 @@
 import { createApp } from "./app";
 import type { ActionJob } from "./domain/types";
 import type { Env } from "./env";
+import { tickSchedule } from "./execution/scheduler";
 
 const app = createApp();
 
-async function onSchedule(_env: Env): Promise<void> {
-  // The durable scheduler is installed in Task 6.
+async function onSchedule(env: Env): Promise<void> {
+  await tickSchedule(env, new Date());
 }
 
 async function onQueue(_batch: MessageBatch<ActionJob>, _env: Env): Promise<void> {
