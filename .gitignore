@@ -1,0 +1,8 @@
+.DS_Store
+.serena/
+.superpowers/
+.worktrees/
+node_modules/
+dist/
+.dev.vars*
+.env*
