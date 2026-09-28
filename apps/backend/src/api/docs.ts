@@ -49,7 +49,7 @@ export const applicationOpenApi = {
     "/api/switch/schedule": { put: operation("Save an immutable schedule revision after reviewing deadlines", {
       201: { description: "Revision saved" }, 400: { description: "Invalid schedule" }, 403: forbidden, 409: { description: "Deadline preview is stale" },
     }, { security: freshSecurity, requestBody: { required: true, content: json(schedule) } }) },
-    "/api/switch/history": { get: operation("Read schedule revisions and round runs", {
+    "/api/switch/history": { get: operation("Read schedule revisions, check-ins, round runs, and action results", {
       200: { description: "Revision and run history" }, 403: forbidden,
     }, { security: ownerSecurity }) },
     "/api/switch/rounds/{id}/rearm": { post: operation("Rearm a manual-rearm round", {

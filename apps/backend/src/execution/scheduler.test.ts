@@ -98,6 +98,22 @@ describe("schedule tick and action claims", () => {
     expect(await claimAction(env.DB, job, due)).toBe("duplicate");
   });
 
+  it("does not claim queued work while paused or disarmed", async () => {
+    const { revisionId, actionIds } = await seed();
+    const sent = vi.fn(async (_job: ActionJob) => {});
+    await tickSchedule(withQueue(sent), due);
+    const actionRun = await env.DB.prepare("SELECT id FROM action_runs").first<{ id: string }>();
+    const job = { runId: actionRun!.id, cycleId: "cycle-1", revisionId, actionId: actionIds[0] };
+    await env.DB.prepare("UPDATE switches SET paused = 1 WHERE id = 1").run();
+    expect(await claimAction(env.DB, job, due)).not.toBe("claimed");
+    await env.DB.prepare("UPDATE switches SET paused = 0, armed = 0 WHERE id = 1").run();
+    expect(await claimAction(env.DB, job, due)).not.toBe("claimed");
+    await env.DB.prepare("UPDATE switches SET armed = 1 WHERE id = 1").run();
+    await tickSchedule(withQueue(sent), due);
+    expect(sent).toHaveBeenCalledTimes(2);
+    expect(await claimAction(env.DB, job, due)).toBe("claimed");
+  });
+
   it("skips old cycle", async () => {
     const { revisionId, actionIds } = await seed();
     await tickSchedule(withQueue(async () => {}), due);

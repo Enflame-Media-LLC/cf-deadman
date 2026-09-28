@@ -5,7 +5,7 @@ import type { Env } from "../env";
 import { saveRevision } from "../switch/repository";
 import { handleActionMessage } from "./coordinator";
 import type { ActionExecutor } from "./executor";
-import { tickSchedule } from "./scheduler";
+import { claimAction, tickSchedule } from "./scheduler";
 import { recordCheckIn } from "../checkin/routes";
 
 const start = "2028-01-01T00:00:00.000Z";
@@ -149,12 +149,38 @@ describe("action coordinator", () => {
     expect(await roundStatus()).toBe("failed");
   });
 
+  it("blocks a sibling claim as soon as a stop-round failure is durable", async () => {
+    const { jobs } = await scenario([{ mode: "concurrent", actions: [
+      { id: "a", policy: "stop_round" }, { id: "b" },
+    ] }]);
+    await env.DB.prepare("UPDATE action_runs SET status = 'failed' WHERE id = ?").bind(jobs[0].runId).run();
+    expect(await claimAction(env.DB, jobs[1], due)).not.toBe("claimed");
+    expect((await statuses()).b).toBe("pending");
+  });
+
   it("ignores duplicate delivery", async () => {
     const { workerEnv, jobs } = await scenario([{ mode: "ordered", actions: [{ id: "a" }] }]);
     const execute = vi.fn(async () => "succeeded" as const);
     await handleActionMessage(workerEnv, jobs[0], { execute }, due);
     await handleActionMessage(workerEnv, jobs[0], { execute }, due);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconciles a saved result after interrupted progression", async () => {
+    const { workerEnv, jobs } = await scenario([{ mode: "ordered", actions: [{ id: "a" }, { id: "b" }] }]);
+    await env.DB.prepare("UPDATE action_runs SET status = 'succeeded', finished_at = ? WHERE id = ?")
+      .bind(due.toISOString(), jobs[0].runId).run();
+    await handleActionMessage(workerEnv, jobs[0], { execute: vi.fn() }, due);
+    expect(jobs.map((job) => job.actionId)).toEqual(["a", "b"]);
+  });
+
+  it("quarantines an abandoned claim without repeating its effect", async () => {
+    const { workerEnv, jobs } = await scenario([{ mode: "ordered", actions: [{ id: "a" }, { id: "b" }] }]);
+    await env.DB.prepare("UPDATE action_runs SET status = 'claimed', claimed_at = ? WHERE id = ?")
+      .bind("2028-01-01T00:00:00.000Z", jobs[0].runId).run();
+    await tickSchedule(workerEnv, due);
+    expect(await statuses()).toEqual({ a: "needs_review", b: "skipped" });
+    expect(await roundStatus()).toBe("needs_review");
   });
 
   it("does not execute an old-cycle delivery after check-in", async () => {

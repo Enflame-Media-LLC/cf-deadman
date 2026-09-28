@@ -127,7 +127,7 @@ describe("check-in", () => {
       .bind(revision.rounds[0].id).first<{ id: string }>();
     await env.DB.prepare("INSERT INTO actions (id, group_id, ordinal, kind, config_ciphertext, failure_policy) VALUES ('action-1', ?, 0, 'webhook', 'encrypted', 'continue')")
       .bind(group!.id).run();
-    await env.DB.prepare("INSERT INTO round_runs (id, cycle_id, revision_id, round_id, status, due_at) VALUES ('run-1', 'old-cycle', ?, ?, 'pending', ?)")
+    await env.DB.prepare("INSERT INTO round_runs (id, cycle_id, revision_id, round_id, status, due_at) VALUES ('run-1', 'old-cycle', ?, ?, 'running', ?)")
       .bind(revision.id, revision.rounds[0].id, "2028-01-08T00:00:00.000Z").run();
     await env.DB.prepare("INSERT INTO action_runs (id, round_run_id, cycle_id, revision_id, action_id, status) VALUES ('action-run-1', 'run-1', 'old-cycle', ?, 'action-1', 'pending')")
       .bind(revision.id).run();

@@ -2,7 +2,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { requireFreshAdminTotp, requireOwner } from "../auth/guard";
 import type { Env } from "../env";
-import { getSwitchStatus, rearmRound, saveRevision, setSwitchPaused } from "./repository";
+import { getSwitchHistory, getSwitchStatus, rearmRound, saveRevision, setSwitchPaused } from "./repository";
 import { scheduleInputSchema } from "./schema";
 
 export { scheduleInputSchema } from "./schema";
@@ -20,13 +20,7 @@ export function registerSwitchRoutes(app: OpenAPIHono<{ Bindings: Env }>): void 
   });
   app.get("/api/switch/history", async (context) => {
     const owner = await requireOwner(context);
-    const [revisions, runs] = await Promise.all([
-      context.env.DB.prepare("SELECT id, version, definition_json, created_at FROM schedule_revisions WHERE owner_id = ? ORDER BY version DESC")
-        .bind(owner.userId).all(),
-      context.env.DB.prepare("SELECT id, cycle_id, revision_id, round_id, status, due_at, started_at, finished_at FROM round_runs ORDER BY due_at DESC LIMIT 200")
-        .all(),
-    ]);
-    return context.json({ revisions: revisions.results, runs: runs.results });
+    return context.json(await getSwitchHistory(context.env.DB, owner.userId));
   });
   app.post("/api/switch/rounds/:id/rearm", async (context) => {
     await requireFreshAdminTotp(context);

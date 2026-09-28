@@ -92,6 +92,15 @@ describe("single owner", () => {
     expect(owner.ownerId).toBeTruthy();
   });
 
+  it("recovers when switch creation fails during claim", async () => {
+    await env.DB.prepare("CREATE TRIGGER fail_switch_claim BEFORE INSERT ON switches BEGIN SELECT RAISE(ABORT, 'injected failure'); END").run();
+    await expect(claimOwner(env, { setupSecret, email: "owner@example.com", password: "correct horse battery staple" })).rejects.toThrow();
+    expect((await env.DB.prepare("SELECT owner_id FROM owner_slot").first<{ owner_id: string | null }>())?.owner_id).toBeNull();
+    await env.DB.prepare("DROP TRIGGER fail_switch_claim").run();
+    const owner = await claimOwner(env, { setupSecret, email: "owner@example.com", password: "correct horse battery staple" });
+    expect((await env.DB.prepare("SELECT owner_id FROM switches").first<{ owner_id: string }>())?.owner_id).toBe(owner.ownerId);
+  });
+
   it("records fresh owner TOTP proof", async () => {
     const email = "totp@example.com";
     const password = "correct horse battery staple";

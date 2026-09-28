@@ -52,12 +52,14 @@ export async function claimOwner(
     const registered = await auth.api.signUpEmail({ body: { email, password: parsed.data.password, name: email } });
     ownerId = registered.user.id;
   }
-  const result = await env.DB.prepare(
-    "UPDATE owner_slot SET owner_id = ?, claimed_at = ? WHERE id = 1 AND owner_id IS NULL AND claim_email = ?",
-  ).bind(ownerId, now, email).run();
-  if (result.meta.changes !== 1) reject();
-  await env.DB.prepare(
-    "INSERT INTO switches (id, owner_id, cycle_id, cycle_started_at, updated_at) VALUES (1, ?, ?, ?, ?)",
-  ).bind(ownerId, crypto.randomUUID(), now, now).run();
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE owner_slot SET owner_id = ?, claimed_at = ? WHERE id = 1 AND owner_id IS NULL AND claim_email = ?",
+    ).bind(ownerId, now, email),
+    env.DB.prepare(
+      "INSERT INTO switches (id, owner_id, cycle_id, cycle_started_at, updated_at) SELECT 1, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM owner_slot WHERE id = 1 AND owner_id = ?)",
+    ).bind(ownerId, crypto.randomUUID(), now, now, ownerId),
+  ]);
+  if (results[0].meta.changes !== 1 || results[1].meta.changes !== 1) reject();
   return { ownerId };
 }

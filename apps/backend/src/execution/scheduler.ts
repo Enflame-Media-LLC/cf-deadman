@@ -57,6 +57,8 @@ async function ensureActionRuns(
 }
 
 export async function tickSchedule(env: Env, now: Date): Promise<void> {
+  const { reconcileRunningRounds } = await import("./coordinator");
+  await reconcileRunningRounds(env.DB, now);
   const active = await env.DB.prepare(
     "SELECT cycle_id, cycle_started_at, active_revision_id, armed, paused FROM switches WHERE id = 1",
   ).first<ActiveSwitch>();
@@ -105,7 +107,7 @@ export async function claimAction(
   now: Date,
 ): Promise<"claimed" | "stale" | "duplicate"> {
   const result = await db.prepare(
-    "UPDATE action_runs SET status = 'claimed', claimed_at = ? WHERE id = ? AND cycle_id = ? AND revision_id = ? AND action_id = ? AND status = 'pending' AND EXISTS (SELECT 1 FROM switches WHERE id = 1 AND cycle_id = ?) AND EXISTS (SELECT 1 FROM outbox WHERE action_run_id = ?) AND EXISTS (SELECT 1 FROM round_runs WHERE id = action_runs.round_run_id AND status = 'running')",
+    "UPDATE action_runs SET status = 'claimed', claimed_at = ? WHERE id = ? AND cycle_id = ? AND revision_id = ? AND action_id = ? AND status = 'pending' AND EXISTS (SELECT 1 FROM switches WHERE id = 1 AND cycle_id = ? AND armed = 1 AND paused = 0) AND EXISTS (SELECT 1 FROM outbox WHERE action_run_id = ?) AND EXISTS (SELECT 1 FROM round_runs WHERE id = action_runs.round_run_id AND status = 'running') AND NOT EXISTS (SELECT 1 FROM action_runs failed JOIN actions source ON source.id = failed.action_id WHERE failed.round_run_id = action_runs.round_run_id AND (failed.status = 'needs_review' OR (failed.status = 'failed' AND (source.failure_policy = 'stop_round' OR (source.failure_policy = 'stop_group' AND source.group_id = (SELECT target.group_id FROM actions target WHERE target.id = action_runs.action_id))))))",
   ).bind(now.toISOString(), job.runId, job.cycleId, job.revisionId, job.actionId, job.cycleId, job.runId).run();
   if (result.meta.changes === 1) return "claimed";
   const active = await db.prepare("SELECT cycle_id FROM switches WHERE id = 1").first<{ cycle_id: string }>();

@@ -23,4 +23,7 @@ export async function enqueueAction(db: D1Database, job: ActionJob, now: Date): 
   await db.prepare(
     "INSERT OR IGNORE INTO outbox (id, action_run_id, payload_json, status, created_at) SELECT ?, ?, ?, 'pending', ? WHERE EXISTS (SELECT 1 FROM switches WHERE id = 1 AND cycle_id = ?) AND EXISTS (SELECT 1 FROM action_runs WHERE id = ? AND cycle_id = ? AND status = 'pending')",
   ).bind(job.runId, job.runId, JSON.stringify(job), now.toISOString(), job.cycleId, job.runId, job.cycleId).run();
+  await db.prepare(
+    "UPDATE outbox SET status = 'pending', published_at = NULL WHERE action_run_id = ? AND status = 'published' AND EXISTS (SELECT 1 FROM switches WHERE id = 1 AND cycle_id = ? AND armed = 1 AND paused = 0) AND EXISTS (SELECT 1 FROM action_runs WHERE id = ? AND cycle_id = ? AND status = 'pending')",
+  ).bind(job.runId, job.cycleId, job.runId, job.cycleId).run();
 }

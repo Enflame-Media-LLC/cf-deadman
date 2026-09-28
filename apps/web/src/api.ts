@@ -17,6 +17,8 @@ export type KeyMetadata = { id: string; created_at: string; expires_at: string |
 export type History = {
   revisions: { id: string; version: number; definition_json: string; created_at: string }[];
   runs: { id: string; cycle_id: string; round_id: string; status: string; due_at: string; started_at: string | null; finished_at: string | null }[];
+  actionRuns: { id: string; round_run_id: string; action_id: string; kind: string; status: string; reason: string | null; claimed_at: string | null; finished_at: string | null }[];
+  checkIns: { id: string; cycle_id: string; method: string; key_id: string | null; session_id: string | null; accepted_at: string }[];
 };
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;

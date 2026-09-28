@@ -23,7 +23,7 @@ const adminCode = ref("");
 const issuedKey = ref("");
 const policy = ref<CheckInPolicy>({ methods: ["session"], hasSeparateTotp: false });
 const keys = ref<KeyMetadata[]>([]);
-const history = ref<History>({ revisions: [], runs: [] });
+const history = ref<History>({ revisions: [], runs: [], actionRuns: [], checkIns: [] });
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 async function attempt(action: () => Promise<void>) {

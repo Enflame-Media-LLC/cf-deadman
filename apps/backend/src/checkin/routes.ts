@@ -29,7 +29,7 @@ export async function recordCheckIn(
       .bind(previous.cycle_id),
     db.prepare("UPDATE action_runs SET status = 'canceled', reason = 'check_in', finished_at = ? WHERE cycle_id = ? AND status = 'pending'")
       .bind(acceptedAt, previous.cycle_id),
-    db.prepare("UPDATE round_runs SET status = 'canceled', finished_at = ? WHERE cycle_id = ? AND status = 'pending'")
+    db.prepare("UPDATE round_runs SET status = 'canceled', finished_at = ? WHERE cycle_id = ? AND status IN ('pending', 'running') AND NOT EXISTS (SELECT 1 FROM action_runs WHERE round_run_id = round_runs.id AND status = 'claimed')")
       .bind(acceptedAt, previous.cycle_id),
   ]);
   if (results[0].meta.changes !== 1 || results[1].meta.changes !== 1) {
